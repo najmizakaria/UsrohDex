@@ -55,14 +55,17 @@ class RelativeNode extends StatelessWidget {
                       ? null
                       : Center(
                           child: Text(
-                            relative.givenName.isNotEmpty ? relative.givenName[0].toUpperCase() : '?',
+                            relative.displayName.isNotEmpty
+                                ? relative.displayName[0].toUpperCase()
+                                : '?',
                             style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: _sideColor),
                           ),
                         )),
             ),
             const SizedBox(height: 4),
             Text(
-              discovered ? relative.givenName : '???',
+              // Canvas shows the nickname (falls back to given name if none set).
+              discovered ? relative.displayName : '???',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,

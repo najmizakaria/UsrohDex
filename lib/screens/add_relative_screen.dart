@@ -14,6 +14,7 @@ class AddRelativeScreen extends StatefulWidget {
 class _AddRelativeScreenState extends State<AddRelativeScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _nicknameController = TextEditingController();
 
   FamilySide _familySide = FamilySide.direct;
   int _generation = 0;
@@ -24,13 +25,13 @@ class _AddRelativeScreenState extends State<AddRelativeScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _nicknameController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<RelativesProvider>();
-    // Only people in an older generation can be picked as a parent.
     final possibleParents =
         provider.relatives.where((r) => r.generation > _generation).toList();
 
@@ -43,9 +44,20 @@ class _AddRelativeScreenState extends State<AddRelativeScreen> {
           children: [
             TextFormField(
               controller: _nameController,
-              decoration: const InputDecoration(labelText: 'Given name'),
+              decoration: const InputDecoration(
+                labelText: 'Full name',
+                hintText: 'e.g. Ahmad bin Ismail',
+              ),
               validator: (v) =>
                   (v == null || v.trim().isEmpty) ? 'Name is required' : null,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _nicknameController,
+              decoration: const InputDecoration(
+                labelText: 'Nickname (optional)',
+                hintText: 'e.g. Ayah — shown on the tree canvas instead of the full name',
+              ),
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<FamilySide>(
@@ -121,6 +133,9 @@ class _AddRelativeScreenState extends State<AddRelativeScreen> {
     if (!_formKey.currentState!.validate()) return;
     await context.read<RelativesProvider>().addRelative(
           givenName: _nameController.text.trim(),
+          nickname: _nicknameController.text.trim().isEmpty
+              ? null
+              : _nicknameController.text.trim(),
           familySide: _familySide,
           generation: _generation,
           fatherId: _fatherId,

@@ -16,6 +16,7 @@ extension FamilySideX on FamilySide {
 class Relative {
   final String id;
   final String givenName;
+  final String? nickname;
   final bool isDiscovered;
   final DateTime? dateDiscovered;
   final String? photoPath;
@@ -32,6 +33,7 @@ class Relative {
     required this.isDiscovered,
     required this.familySide,
     required this.generation,
+    this.nickname,
     this.dateDiscovered,
     this.photoPath,
     this.phoneNumber,
@@ -40,8 +42,13 @@ class Relative {
     this.motherId,
   });
 
+  /// What to show on the tree canvas: nickname if set, otherwise the given name.
+  String get displayName =>
+      (nickname != null && nickname!.trim().isNotEmpty) ? nickname!.trim() : givenName;
+
   Relative copyWith({
     String? givenName,
+    String? nickname,
     bool? isDiscovered,
     DateTime? dateDiscovered,
     String? photoPath,
@@ -51,10 +58,12 @@ class Relative {
     String? motherId,
     bool clearFatherId = false,
     bool clearMotherId = false,
+    bool clearNickname = false,
   }) {
     return Relative(
       id: id,
       givenName: givenName ?? this.givenName,
+      nickname: clearNickname ? null : (nickname ?? this.nickname),
       isDiscovered: isDiscovered ?? this.isDiscovered,
       dateDiscovered: dateDiscovered ?? this.dateDiscovered,
       photoPath: photoPath ?? this.photoPath,
@@ -71,6 +80,7 @@ class Relative {
     return {
       'id': id,
       'givenName': givenName,
+      'nickname': nickname,
       'isDiscovered': isDiscovered ? 1 : 0,
       'dateDiscovered': dateDiscovered?.millisecondsSinceEpoch,
       'photoPath': photoPath,
@@ -87,6 +97,7 @@ class Relative {
     return Relative(
       id: map['id'] as String,
       givenName: map['givenName'] as String,
+      nickname: map['nickname'] as String?,
       isDiscovered: (map['isDiscovered'] as int) == 1,
       dateDiscovered: map['dateDiscovered'] == null
           ? null

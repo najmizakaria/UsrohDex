@@ -43,6 +43,7 @@ class RelativesProvider extends ChangeNotifier {
     required String givenName,
     required FamilySide familySide,
     required int generation,
+    String? nickname,
     String? fatherId,
     String? motherId,
     bool discovered = false,
@@ -50,6 +51,7 @@ class RelativesProvider extends ChangeNotifier {
     final relative = Relative(
       id: _uuid.v4(),
       givenName: givenName,
+      nickname: nickname,
       isDiscovered: discovered,
       dateDiscovered: discovered ? DateTime.now() : null,
       familySide: familySide,

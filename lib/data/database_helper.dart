@@ -8,6 +8,7 @@ class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._internal();
 
   static const _dbName = 'usrohdex.db';
+  static const _dbVersion = 2;
   static const table = 'relatives';
 
   Database? _db;
@@ -23,12 +24,13 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 1,
+      version: _dbVersion,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE $table (
             id TEXT PRIMARY KEY,
             givenName TEXT NOT NULL,
+            nickname TEXT,
             isDiscovered INTEGER NOT NULL DEFAULT 0,
             dateDiscovered INTEGER,
             photoPath TEXT,
@@ -40,6 +42,11 @@ class DatabaseHelper {
             generation INTEGER NOT NULL
           )
         ''');
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await db.execute('ALTER TABLE $table ADD COLUMN nickname TEXT');
+        }
       },
     );
   }
