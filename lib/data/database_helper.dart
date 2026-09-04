@@ -55,4 +55,16 @@ class DatabaseHelper {
     final rows = await db.query(table);
     return rows.map(Relative.fromMap).toList();
   }
+
+  Future<void> deleteRelative(String id) async {
+    final db = await database;
+    await db.update(table, {'fatherId': null}, where: 'fatherId = ?', whereArgs: [id]);
+    await db.update(table, {'motherId': null}, where: 'motherId = ?', whereArgs: [id]);
+    await db.delete(table, where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<String> getDatabaseFilePath() async {
+    final dbPath = await getDatabasesPath();
+    return p.join(dbPath, _dbName);
+  }
 }

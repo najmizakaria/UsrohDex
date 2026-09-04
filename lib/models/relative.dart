@@ -1,4 +1,3 @@
-/// Which side of the family this person belongs to.
 enum FamilySide { direct, paternal, maternal }
 
 extension FamilySideX on FamilySide {
@@ -14,7 +13,6 @@ extension FamilySideX on FamilySide {
   }
 }
 
-/// One person in the tree.
 class Relative {
   final String id;
   final String givenName;
@@ -26,7 +24,7 @@ class Relative {
   final String? fatherId;
   final String? motherId;
   final FamilySide familySide;
-  final int generation; // 0 = You, 1 = Parents, 2 = Grandparents, -1 = Children
+  final int generation;
 
   const Relative({
     required this.id,
@@ -41,6 +39,33 @@ class Relative {
     this.fatherId,
     this.motherId,
   });
+
+  Relative copyWith({
+    String? givenName,
+    bool? isDiscovered,
+    DateTime? dateDiscovered,
+    String? photoPath,
+    String? phoneNumber,
+    DateTime? birthDate,
+    String? fatherId,
+    String? motherId,
+    bool clearFatherId = false,
+    bool clearMotherId = false,
+  }) {
+    return Relative(
+      id: id,
+      givenName: givenName ?? this.givenName,
+      isDiscovered: isDiscovered ?? this.isDiscovered,
+      dateDiscovered: dateDiscovered ?? this.dateDiscovered,
+      photoPath: photoPath ?? this.photoPath,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
+      birthDate: birthDate ?? this.birthDate,
+      fatherId: clearFatherId ? null : (fatherId ?? this.fatherId),
+      motherId: clearMotherId ? null : (motherId ?? this.motherId),
+      familySide: familySide,
+      generation: generation,
+    );
+  }
 
   Map<String, Object?> toMap() {
     return {
