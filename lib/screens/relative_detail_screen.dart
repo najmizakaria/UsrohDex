@@ -7,293 +7,335 @@ import 'package:provider/provider.dart';
 
 import '../models/relative.dart';
 import '../providers/relatives_provider.dart';
+import '../widgets/common.dart';
+import 'add_relative_screen.dart';
 
 class RelativeDetailScreen extends StatefulWidget {
   final String relativeId;
   const RelativeDetailScreen({super.key, required this.relativeId});
-
   @override
   State<RelativeDetailScreen> createState() => _RelativeDetailScreenState();
 }
 
 class _RelativeDetailScreenState extends State<RelativeDetailScreen> {
-  final _picker = ImagePicker();
-  final _dateFmt = DateFormat.yMMMd();
-
-  Future<void> _pickPhoto(ImageSource source) async {
-    final picked = await _picker.pickImage(source: source, maxWidth: 1200, imageQuality: 85);
-    if (picked == null || !mounted) return;
-
-    final provider = context.read<RelativesProvider>();
-    final relative = provider.byId(widget.relativeId);
-    if (relative == null) return;
-
-    final savedPath = await provider.savePhotoForRelative(relative.id, File(picked.path));
-    await provider.updateRelative(relative.copyWith(photoPath: savedPath));
-  }
-
-  void _showPhotoSourceSheet() {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Wrap(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_camera),
-              title: const Text('Take a photo'),
-              onTap: () {
-                Navigator.pop(context);
-                _pickPhoto(ImageSource.camera);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Choose from gallery'),
-              onTap: () {
-                Navigator.pop(context);
-                _pickPhoto(ImageSource.gallery);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _confirmDelete(Relative relative) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete relative?'),
-        content: Text('This removes ${relative.givenName} and their photo permanently.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true && mounted) {
-      await context.read<RelativesProvider>().deleteRelative(relative.id);
-      if (mounted) Navigator.of(context).pop();
+  bool _busy = false;
+  Future<void> _run(Future<void> Function() action) async {
+    setState(() => _busy = true);
+    try {
+      await action();
+    } catch (e) {
+      if (mounted) showFailure(context, e);
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
-  void _editDialog(Relative relative, List<Relative> possibleParents) {
-    final nameController = TextEditingController(text: relative.givenName);
-    final nicknameController = TextEditingController(text: relative.nickname ?? '');
-    final phoneController = TextEditingController(text: relative.phoneNumber ?? '');
-    DateTime? birthDate = relative.birthDate;
-    String? fatherId = relative.fatherId;
-    String? motherId = relative.motherId;
-
-    showDialog(
+  Future<void> _photo(Relative r) async {
+    final source = await showModalBottomSheet<String>(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          title: const Text('Edit details'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(labelText: 'Full name'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: nicknameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Nickname (optional)',
-                    helperText: 'Shown on the tree canvas instead of the full name',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: phoneController,
-                  decoration: const InputDecoration(labelText: 'Phone number'),
-                  keyboardType: TextInputType.phone,
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(birthDate == null ? 'No birth date set' : _dateFmt.format(birthDate!)),
-                    ),
-                    TextButton(
-                      onPressed: () async {
-                        final picked = await showDatePicker(
-                          context: dialogContext,
-                          initialDate: birthDate ?? DateTime(2000),
-                          firstDate: DateTime(1900),
-                          lastDate: DateTime.now(),
-                        );
-                        if (picked != null) {
-                          setDialogState(() => birthDate = picked);
-                        }
-                      },
-                      child: const Text('Pick date'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String?>(
-                  initialValue: fatherId,
-                  decoration: const InputDecoration(labelText: 'Father'),
-                  items: [
-                    const DropdownMenuItem(value: null, child: Text('— none —')),
-                    ...possibleParents.map(
-                      (r) => DropdownMenuItem(value: r.id, child: Text(r.givenName)),
-                    ),
-                  ],
-                  onChanged: (v) => setDialogState(() => fatherId = v),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String?>(
-                  initialValue: motherId,
-                  decoration: const InputDecoration(labelText: 'Mother'),
-                  items: [
-                    const DropdownMenuItem(value: null, child: Text('— none —')),
-                    ...possibleParents.map(
-                      (r) => DropdownMenuItem(value: r.id, child: Text(r.givenName)),
-                    ),
-                  ],
-                  onChanged: (v) => setDialogState(() => motherId = v),
-                ),
-              ],
+      builder: (c) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Take a photo'),
+              onTap: () => Navigator.pop(c, 'camera'),
             ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
-            FilledButton(
-              onPressed: () async {
-                await context.read<RelativesProvider>().updateRelative(
-                      relative.copyWith(
-                        givenName: nameController.text.trim().isEmpty
-                            ? relative.givenName
-                            : nameController.text.trim(),
-                        nickname: nicknameController.text.trim(),
-                        clearNickname: nicknameController.text.trim().isEmpty,
-                        phoneNumber: phoneController.text.trim(),
-                        birthDate: birthDate,
-                        fatherId: fatherId,
-                        motherId: motherId,
-                        clearFatherId: fatherId == null,
-                        clearMotherId: motherId == null,
-                      ),
-                    );
-                if (dialogContext.mounted) Navigator.pop(dialogContext);
-              },
-              child: const Text('Save'),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose from gallery'),
+              onTap: () => Navigator.pop(c, 'gallery'),
             ),
+            if (r.photoPath != null)
+              ListTile(
+                leading: const Icon(Icons.delete_outline),
+                title: const Text('Remove photo'),
+                onTap: () => Navigator.pop(c, 'remove'),
+              ),
           ],
         ),
       ),
     );
+    if (source == null || !mounted) return;
+    await _run(() async {
+      final provider = context.read<RelativesProvider>();
+      if (source == 'remove') {
+        await provider.setPhoto(r.id, null);
+        return;
+      }
+      final image = await ImagePicker().pickImage(
+        source: source == 'camera' ? ImageSource.camera : ImageSource.gallery,
+        maxWidth: 1200,
+        imageQuality: 85,
+      );
+      if (image != null) await provider.setPhoto(r.id, File(image.path));
+    });
   }
 
+  Future<void> _menu(String action, Relative r) async {
+    final provider = context.read<RelativesProvider>();
+    if (action == 'hide') {
+      if (!await confirmAction(
+            context,
+            title: 'Mark as undiscovered?',
+            message: 'Their details will stay saved, but their identity will be hidden until you discover them again.',
+            action: 'Hide identity',
+          ) ||
+          !mounted) {
+        return;
+      }
+      await _run(() => provider.setDiscovered(r.id, false));
+    } else {
+      final links = provider.childrenOf(r.id).length;
+      if (!await confirmAction(
+            context,
+            title: 'Delete this relative?',
+            message:
+                'This permanently removes ${r.visibleName} and their photo. Parent links from $links children and all partner links will be disconnected. Other relatives will remain.',
+            action: 'Delete relative',
+          ) ||
+          !mounted) {
+        return;
+      }
+      await _run(() async {
+        await provider.deleteRelative(r.id);
+        if (mounted) Navigator.pop(context);
+      });
+    }
+  }
+
+  void _add(Relative r, String role) => Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => AddRelativeScreen(relatedTo: r, relationship: role),
+    ),
+  );
+  Widget _relationship(String label, List<Relative> people) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      SectionTitle(label),
+      if (people.isEmpty) const Text('Not connected yet'),
+      for (final p in people)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Card(
+            child: ListTile(
+              leading: PersonAvatar(relative: p),
+              title: Text(p.visibleName),
+              subtitle: Text(p.familySide.label),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => RelativeDetailScreen(relativeId: p.id),
+                ),
+              ),
+            ),
+          ),
+        ),
+    ],
+  );
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<RelativesProvider>();
-    final relative = provider.byId(widget.relativeId);
-
-    if (relative == null) {
-      return const Scaffold(body: Center(child: Text('This relative no longer exists.')));
+    final r = provider.byId(widget.relativeId);
+    if (r == null) {
+      return Scaffold(
+        appBar: AppBar(),
+        body: const Center(child: Text('This relative no longer exists.')),
+      );
     }
-
-    final father = relative.fatherId != null ? provider.byId(relative.fatherId!) : null;
-    final mother = relative.motherId != null ? provider.byId(relative.motherId!) : null;
-    final children = provider.childrenOf(relative.id);
-    final hasPhoto = relative.photoPath != null && File(relative.photoPath!).existsSync();
-    // Anyone in an older generation can be picked as a parent (same rule as Add screen).
-    final possibleParents =
-        provider.relatives.where((r) => r.generation > relative.generation && r.id != relative.id).toList();
-
+    final parents = [
+      if (r.fatherId != null) provider.byId(r.fatherId!),
+      if (r.motherId != null) provider.byId(r.motherId!),
+    ].whereType<Relative>().toList();
     return Scaffold(
       appBar: AppBar(
-        title: Text(relative.isDiscovered ? relative.displayName : 'Shadow Slot'),
+        title: const Text('Family profile'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.delete_outline),
-            onPressed: () => _confirmDelete(relative),
+          PopupMenuButton<String>(
+            enabled: !_busy && !provider.isSaving,
+            onSelected: (v) => _menu(v, r),
+            itemBuilder: (_) => [
+              if (r.isDiscovered)
+                const PopupMenuItem(
+                  value: 'hide',
+                  child: Text('Mark as undiscovered'),
+                ),
+              const PopupMenuItem(
+                value: 'delete',
+                child: Text('Delete relative'),
+              ),
+            ],
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Center(
-            child: GestureDetector(
-              onTap: relative.isDiscovered ? _showPhotoSourceSheet : null,
-              child: CircleAvatar(
-                radius: 64,
-                backgroundColor: relative.isDiscovered ? Colors.grey.shade200 : Colors.black87,
-                backgroundImage: hasPhoto ? FileImage(File(relative.photoPath!)) : null,
-                child: !hasPhoto
-                    ? Icon(
-                        relative.isDiscovered ? Icons.camera_alt : Icons.help_outline,
-                        color: Colors.white70,
-                        size: 32,
-                      )
-                    : null,
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 760),
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
+            children: [
+              if (_busy) const LinearProgressIndicator(),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    children: [
+                      Semantics(
+                        label: r.isDiscovered
+                            ? 'Change profile photo'
+                            : 'Undiscovered relative',
+                        button: r.isDiscovered,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(80),
+                          onTap: r.isDiscovered && !_busy && !provider.isSaving
+                              ? () => _photo(r)
+                              : null,
+                          child: PersonAvatar(relative: r, radius: 58),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        r.visibleName,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.headlineMedium
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      if (r.isDiscovered && r.displayName != r.givenName)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(r.givenName, textAlign: TextAlign.center),
+                        ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: 8,
+                        children: [
+                          Chip(label: Text('${r.familySide.label} family')),
+                          Chip(label: Text('Generation ${r.generation}')),
+                        ],
+                      ),
+                      if (r.isDiscovered)
+                        TextButton.icon(
+                          onPressed: _busy || provider.isSaving
+                              ? null
+                              : () => _photo(r),
+                          icon: const Icon(
+                            Icons.add_a_photo_outlined,
+                            size: 18,
+                          ),
+                          label: const Text('Change photo'),
+                        ),
+                    ],
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(height: 16),
+              if (!r.isDiscovered) ...[
+                const Text(
+                  'A connection waiting to be discovered',
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: _busy || provider.isSaving
+                      ? null
+                      : () => _run(() => provider.discover(r.id)),
+                  icon: const Icon(Icons.auto_awesome_outlined),
+                  label: const Text('Discover this relative'),
+                ),
+              ] else ...[
+                FilledButton.icon(
+                  onPressed: _busy || provider.isSaving
+                      ? null
+                      : () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => AddRelativeScreen(relative: r),
+                          ),
+                        ),
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('Edit profile'),
+                ),
+                const SectionTitle('Personal details'),
+                Card(
+                  child: Column(
+                    children: [
+                      ListTile(
+                        leading: const Icon(Icons.cake_outlined),
+                        title: const Text('Birthday'),
+                        subtitle: Text(
+                          r.birthDate == null
+                              ? 'Not added yet'
+                              : DateFormat.yMMMMd().format(r.birthDate!),
+                        ),
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.phone_outlined),
+                        title: const Text('Phone'),
+                        subtitle: SelectableText(
+                          r.phoneNumber?.isNotEmpty == true
+                              ? r.phoneNumber!
+                              : 'Not added yet',
+                        ),
+                      ),
+                      if (r.dateDiscovered != null)
+                        ListTile(
+                          leading: const Icon(Icons.auto_awesome_outlined),
+                          title: const Text('Discovered'),
+                          subtitle: Text(
+                            DateFormat.yMMMd().format(r.dateDiscovered!),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                if (r.notes?.isNotEmpty == true) ...[
+                  const SectionTitle('Their story'),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: SelectableText(r.notes!),
+                    ),
+                  ),
+                ],
+                _relationship('Parents', parents),
+                _relationship(
+                  'Partners',
+                  r.partnerIds
+                      .map(provider.byId)
+                      .whereType<Relative>()
+                      .toList(),
+                ),
+                _relationship('Siblings', provider.siblingsOf(r)),
+                _relationship('Children', provider.childrenOf(r.id)),
+                const SectionTitle('Grow this family'),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final role in [
+                      if (r.fatherId == null) 'father',
+                      if (r.motherId == null) 'mother',
+                      'partner',
+                      if (r.fatherId != null || r.motherId != null) 'sibling',
+                      'child',
+                    ])
+                      OutlinedButton.icon(
+                        onPressed: provider.isSaving
+                            ? null
+                            : () => _add(r, role),
+                        icon: const Icon(Icons.add, size: 18),
+                        label: Text('Add $role'),
+                      ),
+                  ],
+                ),
+              ],
+            ],
           ),
-          const SizedBox(height: 24),
-          if (!relative.isDiscovered)
-            FilledButton.icon(
-              onPressed: () => context.read<RelativesProvider>().discover(relative.id),
-              icon: const Icon(Icons.lightbulb_outline),
-              label: const Text('Discover this relative'),
-            )
-          else ...[
-            // Full name is only ever shown here in the detail view.
-            _InfoRow(label: 'Full name', value: relative.givenName),
-            if (relative.nickname != null && relative.nickname!.isNotEmpty)
-              _InfoRow(label: 'Nickname', value: relative.nickname!),
-            _InfoRow(label: 'Family side', value: relative.familySide.label),
-            _InfoRow(label: 'Generation', value: relative.generation.toString()),
-            if (relative.birthDate != null)
-              _InfoRow(label: 'Birth date', value: _dateFmt.format(relative.birthDate!)),
-            if (relative.phoneNumber != null && relative.phoneNumber!.isNotEmpty)
-              _InfoRow(label: 'Phone', value: relative.phoneNumber!),
-            _InfoRow(label: 'Father', value: father?.givenName ?? '—'),
-            _InfoRow(label: 'Mother', value: mother?.givenName ?? '—'),
-            if (children.isNotEmpty)
-              _InfoRow(
-                label: 'Children',
-                value: children.map((c) => c.isDiscovered ? c.givenName : '???').join(', '),
-              ),
-            const SizedBox(height: 16),
-            OutlinedButton.icon(
-              onPressed: () => _editDialog(relative, possibleParents),
-              icon: const Icon(Icons.edit),
-              label: const Text('Edit details'),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoRow extends StatelessWidget {
-  final String label;
-  final String value;
-  const _InfoRow({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(width: 110, child: Text(label, style: TextStyle(color: Colors.grey.shade600))),
-          Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.w500))),
-        ],
+        ),
       ),
     );
   }

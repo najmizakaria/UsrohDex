@@ -1,32 +1,25 @@
+import 'dart:convert';
+
 enum FamilySide { direct, paternal, maternal }
 
 extension FamilySideX on FamilySide {
-  String get label {
-    switch (this) {
-      case FamilySide.direct:
-        return 'Direct';
-      case FamilySide.paternal:
-        return 'Paternal';
-      case FamilySide.maternal:
-        return 'Maternal';
-    }
-  }
+  String get label => switch (this) {
+    FamilySide.direct => 'Direct',
+    FamilySide.paternal => 'Paternal',
+    FamilySide.maternal => 'Maternal',
+  };
 }
 
+const _unset = Object();
+
 class Relative {
-  final String id;
-  final String givenName;
-  final String? nickname;
+  final String id, givenName;
+  final String? nickname, photoPath, phoneNumber, fatherId, motherId, notes;
   final bool isDiscovered;
-  final DateTime? dateDiscovered;
-  final String? photoPath;
-  final String? phoneNumber;
-  final DateTime? birthDate;
-  final String? fatherId;
-  final String? motherId;
+  final DateTime? dateDiscovered, birthDate;
   final FamilySide familySide;
   final int generation;
-
+  final List<String> partnerIds;
   const Relative({
     required this.id,
     required this.givenName,
@@ -40,77 +33,102 @@ class Relative {
     this.birthDate,
     this.fatherId,
     this.motherId,
+    this.notes,
+    this.partnerIds = const [],
   });
-
-  /// What to show on the tree canvas: nickname if set, otherwise the given name.
   String get displayName =>
-      (nickname != null && nickname!.trim().isNotEmpty) ? nickname!.trim() : givenName;
-
+      nickname?.trim().isNotEmpty == true ? nickname!.trim() : givenName;
+  String get visibleName =>
+      isDiscovered ? displayName : 'Undiscovered relative';
   Relative copyWith({
     String? givenName,
-    String? nickname,
+    Object? nickname = _unset,
     bool? isDiscovered,
-    DateTime? dateDiscovered,
-    String? photoPath,
-    String? phoneNumber,
-    DateTime? birthDate,
-    String? fatherId,
-    String? motherId,
+    Object? dateDiscovered = _unset,
+    Object? photoPath = _unset,
+    Object? phoneNumber = _unset,
+    Object? birthDate = _unset,
+    Object? fatherId = _unset,
+    Object? motherId = _unset,
+    Object? notes = _unset,
+    FamilySide? familySide,
+    int? generation,
+    List<String>? partnerIds,
     bool clearFatherId = false,
     bool clearMotherId = false,
     bool clearNickname = false,
-  }) {
-    return Relative(
-      id: id,
-      givenName: givenName ?? this.givenName,
-      nickname: clearNickname ? null : (nickname ?? this.nickname),
-      isDiscovered: isDiscovered ?? this.isDiscovered,
-      dateDiscovered: dateDiscovered ?? this.dateDiscovered,
-      photoPath: photoPath ?? this.photoPath,
-      phoneNumber: phoneNumber ?? this.phoneNumber,
-      birthDate: birthDate ?? this.birthDate,
-      fatherId: clearFatherId ? null : (fatherId ?? this.fatherId),
-      motherId: clearMotherId ? null : (motherId ?? this.motherId),
-      familySide: familySide,
-      generation: generation,
-    );
-  }
-
-  Map<String, Object?> toMap() {
-    return {
-      'id': id,
-      'givenName': givenName,
-      'nickname': nickname,
-      'isDiscovered': isDiscovered ? 1 : 0,
-      'dateDiscovered': dateDiscovered?.millisecondsSinceEpoch,
-      'photoPath': photoPath,
-      'phoneNumber': phoneNumber,
-      'birthDate': birthDate?.millisecondsSinceEpoch,
-      'fatherId': fatherId,
-      'motherId': motherId,
-      'familySide': familySide.label,
-      'generation': generation,
-    };
-  }
-
-  factory Relative.fromMap(Map<String, Object?> map) {
-    return Relative(
-      id: map['id'] as String,
-      givenName: map['givenName'] as String,
-      nickname: map['nickname'] as String?,
-      isDiscovered: (map['isDiscovered'] as int) == 1,
-      dateDiscovered: map['dateDiscovered'] == null
-          ? null
-          : DateTime.fromMillisecondsSinceEpoch(map['dateDiscovered'] as int),
-      photoPath: map['photoPath'] as String?,
-      phoneNumber: map['phoneNumber'] as String?,
-      birthDate: map['birthDate'] == null
-          ? null
-          : DateTime.fromMillisecondsSinceEpoch(map['birthDate'] as int),
-      fatherId: map['fatherId'] as String?,
-      motherId: map['motherId'] as String?,
-      familySide: FamilySide.values.firstWhere((e) => e.label == map['familySide']),
-      generation: map['generation'] as int,
-    );
-  }
+  }) => Relative(
+    id: id,
+    givenName: givenName ?? this.givenName,
+    nickname: clearNickname
+        ? null
+        : identical(nickname, _unset)
+        ? this.nickname
+        : nickname as String?,
+    isDiscovered: isDiscovered ?? this.isDiscovered,
+    dateDiscovered: identical(dateDiscovered, _unset)
+        ? this.dateDiscovered
+        : dateDiscovered as DateTime?,
+    photoPath: identical(photoPath, _unset)
+        ? this.photoPath
+        : photoPath as String?,
+    phoneNumber: identical(phoneNumber, _unset)
+        ? this.phoneNumber
+        : phoneNumber as String?,
+    birthDate: identical(birthDate, _unset)
+        ? this.birthDate
+        : birthDate as DateTime?,
+    fatherId: clearFatherId
+        ? null
+        : identical(fatherId, _unset)
+        ? this.fatherId
+        : fatherId as String?,
+    motherId: clearMotherId
+        ? null
+        : identical(motherId, _unset)
+        ? this.motherId
+        : motherId as String?,
+    notes: identical(notes, _unset) ? this.notes : notes as String?,
+    familySide: familySide ?? this.familySide,
+    generation: generation ?? this.generation,
+    partnerIds: List.unmodifiable(partnerIds ?? this.partnerIds),
+  );
+  Map<String, Object?> toMap() => {
+    'id': id,
+    'givenName': givenName,
+    'nickname': nickname,
+    'isDiscovered': isDiscovered ? 1 : 0,
+    'dateDiscovered': dateDiscovered?.millisecondsSinceEpoch,
+    'photoPath': photoPath,
+    'phoneNumber': phoneNumber,
+    'birthDate': birthDate?.millisecondsSinceEpoch,
+    'fatherId': fatherId,
+    'motherId': motherId,
+    'familySide': familySide.label,
+    'generation': generation,
+    'notes': notes,
+    'partnerIds': jsonEncode(partnerIds),
+  };
+  factory Relative.fromMap(Map<String, Object?> m) => Relative(
+    id: m['id'] as String,
+    givenName: m['givenName'] as String,
+    nickname: m['nickname'] as String?,
+    isDiscovered: m['isDiscovered'] == 1,
+    dateDiscovered: m['dateDiscovered'] == null
+        ? null
+        : DateTime.fromMillisecondsSinceEpoch(m['dateDiscovered'] as int),
+    photoPath: m['photoPath'] as String?,
+    phoneNumber: m['phoneNumber'] as String?,
+    birthDate: m['birthDate'] == null
+        ? null
+        : DateTime.fromMillisecondsSinceEpoch(m['birthDate'] as int),
+    fatherId: m['fatherId'] as String?,
+    motherId: m['motherId'] as String?,
+    familySide: FamilySide.values.firstWhere((s) => s.label == m['familySide']),
+    generation: m['generation'] as int,
+    notes: m['notes'] as String?,
+    partnerIds: List<String>.unmodifiable(
+      jsonDecode(m['partnerIds'] as String? ?? '[]') as List,
+    ),
+  );
 }
